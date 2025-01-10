@@ -6,18 +6,9 @@ import { nhost } from "./lib/nhost";
 import { Toaster } from "@/components/ui/toaster";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import ProtectedRoute from "./ProtectedRoute";
+import VerifyEmailPage from "./VerifyEmailPage";
 
-// const authChecker = () => {
-//   const auth = nhost.auth.isAuthenticated();
-//   console.log(auth);
-//   if (auth) {
-//     return <HomePage />;
-//   }
-//   return <SignupPage />;
-// }
-
-const auth = nhost.auth.getUser();
-console.log(auth);
 
 function App() {
   return (
@@ -26,8 +17,9 @@ function App() {
       <ToastContainer />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
         </Routes>
       </BrowserRouter>
     </NhostProvider>

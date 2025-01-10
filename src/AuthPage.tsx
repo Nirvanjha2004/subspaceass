@@ -1,67 +1,90 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { CheckCircle, LogIn } from 'lucide-react';
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { CheckCircle, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { nhost } from './lib/nhost';
-import { useNavigate } from 'react-router-dom';
+import { useSignInEmailPassword, useSignUpEmailPassword } from "@nhost/react";
+import { useNavigate } from "react-router-dom";
 
 function SignupPage() {
-  const [tab, setTab] = useState("login");
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({email: "", password: "" });
+  const [tab, setTab] = useState("signup");
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const {
+    signUpEmailPassword,
+    isLoading: isLoadingSignUp,
+    isError: isErrorSignUp,
+    error: errorSignUp,
+  } = useSignUpEmailPassword();
+
+  const {
+    signInEmailPassword,
+    isLoading: isLoadingSignIn,
+    isError: isErrorSignIn,
+    error: errorSignIn,
+  } = useSignInEmailPassword();
 
   // Handle input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Simulate signup/login API calls
+  // Handle form submit
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-    try {
-      if (tab === "signup") {
-        await nhost.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-        }).then( () => {
+    if (tab === "signup") {
+      try {
+        const res = await signUpEmailPassword(formData.email, formData.password);
+        if (res.error) {
+          toast({
+            title: "Error",
+            description: res.error.message,
+            variant: "destructive",
+          });
+        } else {
           toast({
             title: "Success",
-            description: "Signup successful",
+            description: "Signup successful. Please login.",
             variant: "default",
           });
-          // navigate('/');
-          setLoading(false);
-        });
-      } else {
-        await nhost.auth.signIn({
-          email: formData.email,
-          password: formData.password,
-        }).then(() => {
-          toast({
-            title: "Success",
-            description: "Login successful",
-            variant: "default",
-          });
-          navigate("/");
-          setLoading(false);
+          setTab("login");
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Something went wrong during signup.",
+          variant: "destructive",
         });
       }
-    } catch (error) {
-      console.log(error);
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive",
-      });
-
+    } else {
+      try {
+        const res = await signInEmailPassword(formData.email, formData.password);
+        if (res.error) {
+          toast({
+            title: "Error",
+            description: res.error.message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Login successful. Redirecting...",
+            variant: "default",
+          });
+          navigate("/verify-email");
+        }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Something went wrong during login.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -74,7 +97,7 @@ function SignupPage() {
         className="max-w-md w-full"
       >
         <Card className="p-6">
-          <Tabs defaultValue="login" onValueChange={setTab} className="w-full">
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
             {/* Tabs Header */}
             <TabsList className="grid grid-cols-2">
               <TabsTrigger value="login" className="flex items-center gap-2">
@@ -106,8 +129,12 @@ function SignupPage() {
                   onChange={handleChange}
                   required
                 />
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Processing..." : "Login"}
+                <Button
+                  type="submit"
+                  disabled={isLoadingSignIn}
+                  className="w-full"
+                >
+                  {isLoadingSignIn ? "Processing..." : "Login"}
                 </Button>
               </form>
             </TabsContent>
@@ -131,8 +158,12 @@ function SignupPage() {
                   onChange={handleChange}
                   required
                 />
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? "Processing..." : "Signup"}
+                <Button
+                  type="submit"
+                  disabled={isLoadingSignUp}
+                  className="w-full"
+                >
+                  {isLoadingSignUp ? "Processing..." : "Signup"}
                 </Button>
               </form>
             </TabsContent>

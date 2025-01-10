@@ -14,7 +14,7 @@ const options = {
     lang: "en",
   },
   headers: {
-    "x-rapidapi-key": "dfe94a4d6fmshf1dab4eadb04132p1b5c4ejsn2be74ce3b5be",
+    "x-rapidapi-key": "6870df310bmsh23fbc826ceb19b8p1152acjsn86213df69511",
     "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com",
   },
 };
@@ -24,7 +24,11 @@ app.post("/", async (req: Request, res: Response) => {
   const language = req.body.language;
   const length = req.body.length;
   const response = await axios.request(options);
-  //   console.log("response", response.data[0].transcriptionAsText);
+  if (response.data.error) {
+    res.send(response.data.error);
+    return;
+  }
+  console.log("response", response.data[0].transcriptionAsText);
   try {
     const response2 = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -32,7 +36,7 @@ app.post("/", async (req: Request, res: Response) => {
         method: "POST",
         headers: {
           Authorization:
-            "Bearer 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",
+            "Bearer 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",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -54,8 +58,9 @@ Text: ${response.data[0].transcriptionAsText}
     );
 
     const response2Data = await response2.json();
-    // console.log("response2", response2Data.choices[0].message.content);
-    res.send(response2Data.choices[0].message.content);
+    console.log("response2", response2Data.choices[0].message.content);
+    const summary = response2Data.choices[0].message.content;
+    res.send(summary);
   } catch (error) {
     console.log("error", error);
   }

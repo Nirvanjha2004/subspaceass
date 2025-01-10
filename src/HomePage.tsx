@@ -1,12 +1,23 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Youtube, Sparkles, Clock, Bot, Languages, AlignJustify, History, Wand2 } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Youtube,
+  Sparkles,
+  Clock,
+  Bot,
+  Languages,
+  AlignJustify,
+  History,
+  Wand2,
+  HardDrive,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import axios from 'axios';
+import axios from "axios";
+import { useSignOut } from "@nhost/react";
 import {
   Select,
   SelectContent,
@@ -14,17 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Slider
-} from "@/components/ui/slider";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import './App.css';
-import { useNavigate } from 'react-router-dom';
+import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import "./App.css";
+import { nhost } from "./lib/nhost";
+import { useNavigate } from "react-router-dom";
+
+let videoId: string | null = null;
 
 const languages = [
   { value: "en", label: "English" },
@@ -39,51 +46,214 @@ const languages = [
   { value: "zh", label: "Chinese" },
 ];
 
-
 function App() {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [summary, setSummary] = useState('');
-  const [language, setLanguage] = useState('en');
+  const [summary, setSummary] = useState("");
+  const [language, setLanguage] = useState("en");
   const [length, setLength] = useState([50]);
+  const [isSummarizing, setIsSummarizing] = useState(false); // For the Summarize button
+  const [isUploading, setIsUploading] = useState(false); // For the Upload button
+  const [savedSummaries, setSavedSummaries] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { signOut } = useSignOut();
 
   function getYouTubeVideoId(url: string) {
-    const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+    const regex =
+      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
     const match = url.match(regex);
     return match ? match[1] : null;
   }
 
   useEffect(() => {
-    toast({
-      title: "Verify Email",
-      description: "Please verify your email else your data will be lost",
-      variant: "default",
-    })
-  }, []);
-  
-  const summarizeVideo = async () => {
-    // Simulate API call
-    try {
-        const videoId = getYouTubeVideoId(url);
-      const response = await axios.post('http://localhost:3000', {
-        url: url,
-        video_id: videoId,
-        language: language,
-        length: length,
+    const userId = nhost.auth.getUser()?.id;
+
+    if (!userId) {
+      console.warn("User not logged in.");
+      return;
+    }
+
+    setLoadingHistory(true);
+
+    fetchSavedSummaries(userId)
+      .then((summaries) => {
+        setSavedSummaries(summaries);
+      })
+      .catch((error) => {
+        toast({
+          title: "Error",
+          description: "Failed to fetch summary history.",
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        setLoadingHistory(false);
       });
-      setSummary(response.data);
-      console.log(response.data);
+  }, []);
+
+  async function saveSummary(userId: string, videoId: string, summary: string) {
+    const mutation = `
+      mutation InsertUserSummary($userId: uuid!, $videoId: String!, $summary: String!) {
+        insert_user_summaries(objects: { user_id: $userId, video_id: $videoId, summary: $summary }) {
+          affected_rows
+        }
+      }
+    `;
+
+    const variables = { userId, videoId, summary };
+
+    try {
+      const response = await nhost.graphql.request(mutation, variables);
+
+      // Check for errors
+      if (response.error) {
+        console.error("GraphQL Error:", response.error);
+        throw new Error(response.error.message || "GraphQL mutation failed.");
+      }
+
+      // Handle success
+      console.log(
+        "Rows affected:",
+        response.data.insert_user_summaries.affected_rows
+      );
+      return response.data.insert_user_summaries.affected_rows;
     } catch (error) {
-      console.error(error);
+      console.error("Unexpected error saving summary:", error);
+      throw error;
+    }
+  }
+
+  async function fetchSavedSummaries(userId: string) {
+    const query = `
+      query GetUserSummaries($userId: uuid!) {
+        user_summaries(where: { user_id: { _eq: $userId } }) {
+          video_id
+          summary
+        }
+      }
+    `;
+
+    const variables = { userId };
+
+    try {
+      const response = await nhost.graphql.request(query, variables);
+
+      if (response.error) {
+        console.error("GraphQL Error:", response.error);
+        throw new Error(response.error.message || "GraphQL query failed.");
+      }
+
+      return response.data.user_summaries; // Return the summaries
+    } catch (error) {
+      console.error("Unexpected error fetching summaries:", error);
+      throw error;
+    }
+  }
+
+  const logout = () => {
+    signOut();
+    navigate("/signup");
+  };
+
+  const summarizeVideo = async () => {
+    if (!url.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid YouTube URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSummarizing(true);
+
+    try {
+      videoId = getYouTubeVideoId(url);
+
+      if (!videoId) {
+        toast({
+          title: "Error",
+          description: "Invalid YouTube URL",
+          variant: "destructive",
+        });
+        setIsSummarizing(false);
+        return;
+      }
+
+      const response = await axios.post("http://localhost:3000", {
+        url,
+        video_id: videoId,
+        language,
+        length,
+      });
+
+      setSummary(response.data); // Set the summarized content
+      toast({
+        title: "Success",
+        description: "Summary generated successfully!",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error summarizing video:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate summary. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSummarizing(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    navigate('/signup');
-  }
+  const handleSaveSummary = async () => {
+    if (!videoId || !summary.trim()) {
+      toast({
+        title: "Error",
+        description: "No summary available to save.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const userId = nhost.auth.getUser()?.id; // Get the authenticated user ID
+
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "Please login to save your summary",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const savedSummary = await saveSummary(userId, videoId, summary);
+
+      if (savedSummary) {
+        toast({
+          title: "Success",
+          description: "Summary saved successfully!",
+          variant: "default",
+        });
+      } else {
+        throw new Error("Failed to save summary.");
+      }
+    } catch (error) {
+      console.error("Error saving summary:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save summary. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,15 +265,20 @@ function App() {
       });
       return;
     }
-    setLoading(true);
-
-    await summarizeVideo();
     setLoading(false);
+    await summarizeVideo();
+    setLoading(true);
   };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-secondary">
-        <Button variant="outline" className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-2" onClick={logout}>Logout</Button>
+      <Button
+        variant="outline"
+        className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-2"
+        onClick={logout}
+      >
+        Logout
+      </Button>
       <div className="w-full min-h-screen flex flex-col">
         <div className="flex-1 w-full px-4 py-8">
           <motion.div
@@ -129,7 +304,9 @@ function App() {
                 <h1 className="text-3xl sm:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-purple-600">
                   YouTube Summarizer
                 </h1>
-                <p className="text-muted-foreground mt-1">Transform long videos into concise summaries</p>
+                <p className="text-muted-foreground mt-1">
+                  Transform long videos into concise summaries
+                </p>
               </div>
             </motion.div>
 
@@ -137,11 +314,17 @@ function App() {
             <div className="w-full">
               <Tabs defaultValue="summarize" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-8">
-                  <TabsTrigger value="summarize" className="flex items-center gap-2">
+                  <TabsTrigger
+                    value="summarize"
+                    className="flex items-center gap-2"
+                  >
                     <Wand2 className="h-4 w-4" />
                     <span className="hidden sm:inline">Summarize</span>
                   </TabsTrigger>
-                  <TabsTrigger value="history" className="flex items-center gap-2">
+                  <TabsTrigger
+                    value="history"
+                    className="flex items-center gap-2"
+                  >
                     <History className="h-4 w-4" />
                     <span className="hidden sm:inline">History</span>
                   </TabsTrigger>
@@ -160,15 +343,19 @@ function App() {
                             onChange={(e) => setUrl(e.target.value)}
                             className="flex-1"
                           />
-                          <Button 
-                            type="submit" 
-                            disabled={loading}
+                          <Button
+                            type="submit"
+                            disabled={isSummarizing}
                             className="w-full sm:w-auto"
                           >
-                            {loading ? (
+                            {isSummarizing ? (
                               <motion.div
                                 animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                transition={{
+                                  duration: 1,
+                                  repeat: Infinity,
+                                  ease: "linear",
+                                }}
                                 className="flex items-center gap-2"
                               >
                                 <Sparkles className="h-4 w-4" />
@@ -204,14 +391,43 @@ function App() {
                             </SelectContent>
                           </Select>
                         </div>
+                        <Button
+                          onClick={handleSaveSummary}
+                          className="w-full sm:w-auto"
+                          disabled={isUploading}
+                        >
+                          {isUploading ? (
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{
+                                duration: 1,
+                                repeat: Infinity,
+                                ease: "linear",
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <HardDrive className="h-4 w-4" />
+                              <span>Saving...</span>
+                            </motion.div>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              <HardDrive className="h-4 w-4" />
+                              <span>Upload</span>
+                            </span>
+                          )}
+                        </Button>
 
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <div className="flex items-center space-x-2">
                               <AlignJustify className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">Summary Length</span>
+                              <span className="font-medium">
+                                Summary Length
+                              </span>
                             </div>
-                            <span className="text-muted-foreground">{length}%</span>
+                            <span className="text-muted-foreground">
+                              {length}%
+                            </span>
                           </div>
                           <Slider
                             value={length}
@@ -249,7 +465,12 @@ function App() {
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1.5">
                                 <Languages className="h-4 w-4" />
-                                <span>{languages.find(l => l.value === language)?.label}</span>
+                                <span>
+                                  {
+                                    languages.find((l) => l.value === language)
+                                      ?.label
+                                  }
+                                </span>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <AlignJustify className="h-4 w-4" />
@@ -259,7 +480,9 @@ function App() {
                           </div>
 
                           <div className="bg-muted/50 rounded-lg p-4">
-                            <p className="text-muted-foreground leading-relaxed">{summary}</p>
+                            <p className="text-muted-foreground leading-relaxed">
+                              {summary}
+                            </p>
                           </div>
 
                           <div className="flex items-center justify-end text-sm text-muted-foreground">
@@ -274,11 +497,64 @@ function App() {
 
                 <TabsContent value="history" className="w-full">
                   <Card className="p-6">
-                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                      <History className="h-12 w-12 mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No History Yet</h3>
-                      <p className="text-sm">Your summarized videos will appear here</p>
-                    </div>
+                    {loadingHistory ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
+                          className="h-12 w-12 border-4 border-muted rounded-full border-t-transparent mb-4"
+                        ></motion.div>
+                        <p className="text-sm">
+                          Loading your saved summaries...
+                        </p>
+                      </div>
+                    ) : savedSummaries.length > 0 ? (
+                      <div className="space-y-6">
+                        {savedSummaries.map(
+                          (
+                            item: { video_id: string; summary: string },
+                            index
+                          ) => (
+                            <div
+                              key={index}
+                              className="p-4 rounded-lg bg-muted/50"
+                            >
+                              <div className="mb-2 flex items-center justify-between">
+                                <a
+                                  href={`https://www.youtube.com/watch?v=${item.video_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary font-medium hover:underline"
+                                >
+                                  Video Link
+                                </a>
+                                <span className="text-sm text-muted-foreground">
+                                  Summary #{index + 1}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {item.summary}
+                              </p>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                        <History className="h-12 w-12 mb-4" />
+                        <h3 className="text-lg font-medium mb-2">
+                          No History Yet
+                        </h3>
+                        <p className="text-sm">
+                          Your saved summaries will appear here after you upload
+                          them.
+                        </p>
+                      </div>
+                    )}
                   </Card>
                 </TabsContent>
               </Tabs>
@@ -291,7 +567,10 @@ function App() {
               transition={{ delay: 0.5 }}
               className="text-center text-sm text-muted-foreground mt-8"
             >
-              <p>Powered by AI • Fast and accurate video summaries in multiple languages</p>
+              <p>
+                Powered by AI • Fast and accurate video summaries in multiple
+                languages
+              </p>
             </motion.div>
           </motion.div>
         </div>
