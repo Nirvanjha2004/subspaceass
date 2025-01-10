@@ -18,15 +18,11 @@ function SignupPage() {
   const {
     signUpEmailPassword,
     isLoading: isLoadingSignUp,
-    isError: isErrorSignUp,
-    error: errorSignUp,
   } = useSignUpEmailPassword();
 
   const {
     signInEmailPassword,
     isLoading: isLoadingSignIn,
-    isError: isErrorSignIn,
-    error: errorSignIn,
   } = useSignInEmailPassword();
 
   // Handle input changes
@@ -57,7 +53,7 @@ function SignupPage() {
       } catch (error) {
         toast({
           title: "Error",
-          description: "Something went wrong during signup.",
+          description: "Something went wrong during signup. Error: " + error,
           variant: "destructive",
         });
       }
@@ -81,7 +77,7 @@ function SignupPage() {
       } catch (error) {
         toast({
           title: "Error",
-          description: "Something went wrong during login.",
+          description: "Something went wrong during login. Error: " + error,
           variant: "destructive",
         });
       }

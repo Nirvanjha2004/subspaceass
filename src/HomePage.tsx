@@ -48,8 +48,8 @@ const languages = [
 
 function App() {
   const [url, setUrl] = useState("");
-  const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState("");
+  const [loading, setLoading] = useState(false);
   const [language, setLanguage] = useState("en");
   const [length, setLength] = useState([50]);
   const [isSummarizing, setIsSummarizing] = useState(false); // For the Summarize button
@@ -85,7 +85,7 @@ function App() {
       .catch((error) => {
         toast({
           title: "Error",
-          description: "Failed to fetch summary history.",
+          description: "Failed to fetch summary history. Error: " + error,      
           variant: "destructive",
         });
       })
@@ -111,7 +111,6 @@ function App() {
       // Check for errors
       if (response.error) {
         console.error("GraphQL Error:", response.error);
-        throw new Error(response.error.message || "GraphQL mutation failed.");
       }
 
       // Handle success
@@ -143,7 +142,6 @@ function App() {
 
       if (response.error) {
         console.error("GraphQL Error:", response.error);
-        throw new Error(response.error.message || "GraphQL query failed.");
       }
 
       return response.data.user_summaries; // Return the summaries
