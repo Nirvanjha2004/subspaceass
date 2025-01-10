@@ -270,6 +270,7 @@ function App() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-secondary">
+        <div className="hidden">{loading}</div>
       <Button
         variant="outline"
         className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-2"
