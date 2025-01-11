@@ -3,7 +3,13 @@ import cors from "cors";
 import axios from "axios";
 
 const app = express();
-app.use(cors({ origin: "https://subspaceass.vercel.app/" })); // Handle preflight requests
+app.use(
+  cors({
+    origin: "*", // Allow all origins
+    methods: ["GET", "POST", "PUT", "DELETE"], // Allowed HTTP methods
+    allowedHeaders: ["Content-Type", "Authorization"], // Allowed headers
+  })
+);
 app.use(express.json());
 
 const options = {
