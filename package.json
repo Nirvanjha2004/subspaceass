@@ -6,7 +6,7 @@
   "scripts": {
     "start": "bun run dev",
     "dev": "vite",
-    "build": "bun run build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
