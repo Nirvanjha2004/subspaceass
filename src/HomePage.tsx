@@ -85,7 +85,7 @@ function App() {
       .catch((error) => {
         toast({
           title: "Error",
-          description: "Failed to fetch summary history. Error: " + error,      
+          description: "Failed to fetch summary history. Error: " + error,
           variant: "destructive",
         });
       })
@@ -181,19 +181,25 @@ function App() {
         return;
       }
 
-      const response = await axios.post("https://subspaceass-3w5t.vercel.app/", {
-        url,
-        video_id: videoId,
-        language,
-        length,
-      });
-
-      setSummary(response.data); // Set the summarized content
-      toast({
-        title: "Success",
-        description: "Summary generated successfully!",
-        variant: "default",
-      });
+      try {
+        const response = await axios.post(
+          "https://subspaceass-3w5t.vercel.app/",
+          {
+            url,
+            video_id: videoId,
+            language,
+            length,
+          }
+        );
+        setSummary(response.data); // Set the summarized content
+        toast({
+          title: "Success",
+          description: "Summary generated successfully!",
+          variant: "default",
+        });
+      } catch (error) {
+        console.log(error);
+      }
     } catch (error) {
       console.error("Error summarizing video:", error);
       toast({
@@ -270,7 +276,7 @@ function App() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-background via-background to-secondary">
-        <div className="hidden">{loading}</div>
+      <div className="hidden">{loading}</div>
       <Button
         variant="outline"
         className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-2"

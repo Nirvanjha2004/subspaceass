@@ -3,7 +3,7 @@ import cors from "cors";
 import axios from "axios";
 
 const app = express();
-app.options("*", cors()); // Handle preflight requests
+app.use(cors()) // Handle preflight requests
 app.use(express.json());
 
 const options = {
@@ -14,7 +14,7 @@ const options = {
     lang: "en",
   },
   headers: {
-    "x-rapidapi-key": "6870df310bmsh23fbc826ceb19b8p1152acjsn86213df69511",
+    "x-rapidapi-key": "16fa35971bmsh9ecc462cf8e1317p1de334jsnb9b08f5bab6b",
     "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com",
   },
 };
@@ -36,7 +36,7 @@ app.post("/", async (req: Request, res: Response) => {
         method: "POST",
         headers: {
           Authorization:
-            "Bearer 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",
+            "Bearer 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",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
