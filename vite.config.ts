@@ -13,7 +13,8 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    outDir: 'dist', // Output directory for the build
+    outDir: 'dist', // Ensure the output is in the "dist" folder
   },
 });
+
 
